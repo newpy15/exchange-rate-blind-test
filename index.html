@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>오늘의 진짜 정보판 — T04 검증 대시보드</title>
+<style>
+  :root{
+    --bg:#0f1115;--panel:#171a21;--panel-2:#1e222b;--line:#2a2f3a;
+    --text:#e7ecf3;--muted:#9aa4b2;--ok:#3ddc97;--warn:#f5c451;
+    --err:#ff6b6b;--stale:#b48cff;--accent:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.5;padding:24px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:16px;margin:0 0 12px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+  .warning-banner {
+    background: rgba(245, 196, 81, 0.1);
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;max-width:1500px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card.full{grid-column:1/-1}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .row.between{justify-content:space-between}
+  button, select{cursor:pointer;transition:border-color .15s,background .15s;
+    font:inherit;background:var(--panel-2);color:var(--text);
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  button:hover, select:hover{border-color:var(--accent)}
+  button.primary{background:#1f3b5c;border-color:#2f5c8c}
+  button.ghost{background:transparent}
+  button.danger{background:#4a1f1f;border-color:#7a2f2f}
+  button.success{background:#1f4a2e;border-color:#2f7a4a; color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  td.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+  td.mid{font-variant-numeric:tabular-nums;text-align:center}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);margin-right:4px}
+  .badge.ok{color:var(--ok);border-color:var(--ok)}
+  .badge.warn{color:var(--warn);border-color:var(--warn)}
+  .badge.err{color:var(--err);border-color:var(--err)}
+  .badge.stale{color:var(--stale);border-color:var(--stale)}
+  .badge.none{color:var(--muted)}
+  .badge.fresh{color:var(--ok);border-color:var(--ok)}
+  .badge.new{color:#0f1115;background:var(--accent);border-color:var(--accent);font-weight:700}
+  .diff-pos{color:var(--ok)}
+  .diff-neg{color:var(--err)}
+  .week-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:12px}
+  .week-stat{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px}
+  .week-stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase}
+  .week-stat .val{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+  .week-stat .chg{font-size:12px;margin-top:2px}
+
+  /* 토글 섹션 */
+  .toggle-head{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;user-select:none;}
+  .toggle-head:hover .toggle-title{color:#9fd0ff}
+  .toggle-title{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:600;color:var(--accent);transition:color .15s;}
+  .toggle-chevron{display:inline-block;width:16px;text-align:center;transition:transform .2s ease;color:var(--muted);font-size:12px;}
+  .toggle-section.collapsed .toggle-chevron{transform:rotate(-90deg)}
+  .toggle-section.collapsed .toggle-body{display:none}
+  .toggle-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .toggle-body{margin-top:12px}
+  .toggle-hint{font-size:11px;color:var(--muted);margin-top:6px}
+  .new-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-left:4px;box-shadow:0 0 0 0 rgba(90,169,255,.7);animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(90,169,255,.7)}70%{box-shadow:0 0 0 6px rgba(90,169,255,0)}100%{box-shadow:0 0 0 0 rgba(90,169,255,0)}}
+
+  /* 3계층 상세 */
+  .triple-block{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--panel-2);}
+  .triple-block.mismatch{border-color:var(--err);background:rgba(255,107,107,.06)}
+  .triple-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px}
+  .triple-pair{font-weight:700}
+  .layers{display:grid;grid-template-columns:110px 1fr;gap:2px 10px;font-size:12px}
+  .layers dt{color:var(--muted)}
+  .layers dd{margin:0;font-family:ui-monospace,monospace;word-break:break-all}
+  .norm{color:var(--accent);font-weight:600}
+  .raw-string{color:var(--warn)}
+  .verdict{font-size:11px}
+  
+  /* 컨트롤 패널 */
+  .control-panel {background: var(--panel-2);border: 1px solid var(--line);border-radius: 8px;padding: 12px;margin-top: 14px;display: flex;flex-direction: column;gap: 10px;}
+</style>
+</head>
+<body>
+
+<h1>오늘의 진짜 정보판 — T04 검증 대시보드</h1>
+<div class="sub">원자료(원본 문자열) → 저장값(직렬화·타입변환 왕복) → 화면값(DOM에서 다시 읽기)을 각각 독립 생성하고, 숫자 정규화 후 비교합니다.</div>
+
+<div class="warning-banner">
+  <span>⚠️</span>
+  <strong>주의:</strong> 본 화면의 합성 D1/D2 시나리오는 테스트용 가상 시계입니다. 실제 공개 원천의 서로 다른 실제 날짜 2건을 대신하지 않습니다. (T04-C22, C23, C24 한계)
+</div>
+
+<div class="grid">
+
+  <!-- 7일 비교표 -->
+  <section class="card full">
+    <div class="row between" style="margin-bottom:12px">
+      <h2 style="margin:0">📅 7일 환율 비교표 (결정론적 데이터)</h2>
+      <span id="week-state"><span class="badge none">대기</span></span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>날짜 (KST)</th>
+          <th style="text-align:center">🇺🇸 USD/KRW</th>
+          <th style="text-align:center">전일 대비</th>
+          <th style="text-align:center">🇯🇵 JPY(100)/KRW</th>
+          <th style="text-align:center">전일 대비</th>
+          <th style="text-align:center">USD/JPY (교차)</th>
+          <th>출처 시각</th>
+          <th>상태 (Freshness/Error)</th>
+        </tr>
+      </thead>
+      <tbody id="week-body">
+        <tr><td colspan="8" class="note">"7일 데이터 불러오기"를 눌러 비교표를 채우세요.</td></tr>
+      </tbody>
+    </table>
+
+    <!-- 기본 데이터 조작 -->
+    <div class="row" style="margin-top:14px">
+      <button class="primary" id="btn-fetch-week">7일 데이터 초기화 (Reset)</button>
+      <button class="danger ghost" id="btn-inject-mismatch" title="검증이 실제로 작동하는지 확인하는 데모">3계층 불일치 1건 주입 (데모)</button>
+    </div>
+
+    <!-- 실패 및 복구 컨트롤 패널 -->
+    <div class="control-panel">
+      <div style="font-size:14px; font-weight:600; color:var(--accent);">⚙️ 장애 시뮬레이션 및 복구 (Fixture 재생)</div>
+      <div class="row">
+        <select id="fixture-select">
+          <option value="timeout">T04-TIMEOUT (응답 지연)</option>
+          <option value="auth">T04-AUTH-401 (인증 거절)</option>
+          <option value="rate_limit">T04-RATE-429 (호출 제한)</option>
+          <option value="offline">T04-OFFLINE (오프라인)</option>
+          <option value="schema_error">T04-SCHEMA-BREAK (형식 변경)</option>
+        </select>
+        <button class="danger" id="btn-apply-failure">선택한 실패 적용 (Stale 전환)</button>
+        <button class="success" id="btn-recover" style="margin-left:auto;">T04-RECOVER-D2 실행 (복구)</button>
+      </div>
+      <div class="note">실패 적용 시 마지막 정상값이 유지되며(stale), 복구 실행 시 다음 날짜의 새 일별 기록이 추가되고 fresh 상태로 돌아옵니다.</div>
+    </div>
+
+    <div class="note" id="week-note" style="margin-top:12px;">
+      초기화 후 실패 및 복구 시나리오를 테스트해 보세요.
+    </div>
+  </section>
+
+  <!-- 7일 요약 -->
+  <section class="card full">
+    <h2>📊 7일 요약</h2>
+    <div class="week-summary">
+      <div class="week-stat"><div class="lbl">USD/KRW 최고</div><div class="val" id="sum-usd-high">—</div></div>
+      <div class="week-stat"><div class="lbl">USD/KRW 최저</div><div class="val" id="sum-usd-low">—</div></div>
+      <div class="week-stat"><div class="lbl">USD/KRW 7일 변동</div><div class="val" id="sum-usd-chg">—</div><div class="chg" id="sum-usd-chg-pct"></div></div>
+      <div class="week-stat"><div class="lbl">JPY(100)/KRW 최고</div><div class="val" id="sum-jpy-high">—</div></div>
+      <div class="week-stat"><div class="lbl">JPY(100)/KRW 최저</div><div class="val" id="sum-jpy-low">—</div></div>
+      <div class="week-stat"><div class="lbl">JPY(100)/KRW 7일 변동</div><div class="val" id="sum-jpy-chg">—</div><div class="chg" id="sum-jpy-chg-pct"></div></div>
+    </div>
+  </section>
+
+  <!-- 3계층 대조 (토글) -->
+  <section class="card full toggle-section collapsed" id="triple-section">
+    <div class="toggle-head" id="triple-toggle" role="button" tabindex="0" aria-expanded="false">
+      <span class="toggle-title">
+        <span class="toggle-chevron">▼</span>
+        📋 원자료 · 저장값 · 화면값 대조 (T04-C10 검증)
+        <span id="triple-newdot"></span>
+      </span>
+      <span class="toggle-meta">
+        <label class="auto-open" title="데이터 로드 시 자동으로 펼치기">
+          <input type="checkbox" id="triple-auto" checked />
+          자동 펼침
+        </label>
+        <span id="triple-count" class="mono">0건</span>
+        <span id="triple-verdict"><span class="badge none">대기</span></span>
+      </span>
+    </div>
+    <div class="toggle-body" id="triple-body-wrap">
+      <div id="triple-week-body">
+        <div class="note">데이터를 불러오면 3계층 대조가 자동으로 채워집니다.</div>
+      </div>
+      <div class="toggle-hint">"3계층 불일치 1건 주입" 버튼을 눌러 검증 로직이 제대로 작동하는지 확인할 수 있습니다.</div>
+    </div>
+  </section>
+
+</div>
+
+<!-- 화면값을 실제 DOM에서 읽기 위한 숨김 렌더 셀 -->
+<div id="render-stage" style="position:absolute;left:-9999px;top:-9999px" aria-hidden="true"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const nowISO = () => new Date().toISOString();
+  const kstDate = (iso) => new Date(new Date(iso).getTime() + 9*3600*1000).toISOString().slice(0,10);
+  const fmt = (n, d=2) => new Intl.NumberFormat("ko-KR", { minimumFractionDigits:d, maximumFractionDigits:d }).format(n);
+  const badge = (cls, text) => `<span class="badge ${cls}">${text}</span>`;
+
+  let weekData = null;
+  let injectMismatch = false;
+  let isRecovered = false;
+
+  // ---------- 숫자 정규화 ----------
+  function normalizeNum(x) {
+    if (typeof x === "number") return Number(x.toFixed(2));
+    const cleaned = String(x).replace(/,/g, "").trim();
+    return Number(Number(cleaned).toFixed(2));
+  }
+
+  // ---------- 합성 7일 데이터 생성 (고정된 결정론적 데이터) ----------
+  function generate7Days() {
+    const days = [];
+    // T04 과제의 fixture 요구사항에 맞춘 고정 데이터 흐름
+    const mockData = [
+      { usd: 1325.50, jpy: 835.20 }, // D-6
+      { usd: 1330.10, jpy: 838.50 }, // D-5
+      { usd: 1328.40, jpy: 840.10 }, // D-4
+      { usd: 1335.20, jpy: 842.00 }, // D-3 (불일치 데모 타겟)
+      { usd: 1332.00, jpy: 841.50 }, // D-2
+      { usd: 1338.00, jpy: 845.00 }, // D-1 (정상값 105 대용)
+      { usd: 1340.00, jpy: 846.50 }  // D-Day (가장 최근)
+    ];
+
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today.getTime() - i * 24 * 3600 * 1000);
+      const dataIndex = 6 - i;
+      const usdRawString = mockData[dataIndex].usd.toFixed(2);
+      const jpyRawString = mockData[dataIndex].jpy.toFixed(2);
+
+      days.push({
+        iso: d.toISOString(),
+        date: kstDate(d.toISOString()),
+        usdRaw: usdRawString,
+        jpyRaw: jpyRawString,
+        source: "합성 공개 원천 (ECOS 대체)",
+        sourceTime: d.toISOString(),
+        state: "fresh"
+      });
+    }
+    return days;
+  }
+
+  // =====================================================================
+  // 3계층 독립 생성 및 검증 (T04-C10)
+  // =====================================================================
+  function makeRawLayer(rawString, unit, source, sourceTime) {
+    return { kind: "raw", text: rawString, unit, source, sourceTime };
+  }
+
+  function makeStoredLayer(rawString, unit, source, sourceTime, fetchTime) {
+    // 스토리지 저장 시뮬레이션 (JSON 직렬화 -> 파싱 -> 숫자 변환)
+    const serialized = JSON.stringify({ v: rawString, u: unit, s: source, t: sourceTime });
+    const parsed = JSON.parse(serialized);
+    const numeric = Number(parsed.v);
+    return { kind: "stored", value: numeric, unit: parsed.u, source: parsed.s, sourceTime: parsed.t, fetchTime };
+  }
+
+  function makeScreenLayer(storedValue, unit, source, sourceTime, renderKey) {
+    // DOM 렌더링 후 read-back 시뮬레이션
+    const stage = $("render-stage");
+    const cell = document.createElement("span");
+    cell.dataset.renderKey = renderKey;
+    cell.textContent = new Intl.NumberFormat("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(storedValue);
+    stage.appendChild(cell);
+    const readBack = cell.textContent;
+    stage.removeChild(cell);
+    return { kind: "screen", text: readBack, unit, source, sourceTime };
+  }
+
+  function verifyTriple(raw, stored, screen) {
+    const nRaw = normalizeNum(raw.text);
+    const nStored = normalizeNum(stored.value);
+    const nScreen = normalizeNum(screen.text);
+
+    let nScreenChecked = nScreen;
+    if (injectMismatch && raw._mark) {
+      nScreenChecked = Number((nScreen + 1).toFixed(2)); // 데모를 위해 1 더함
+    }
+
+    const match = (nRaw === nStored) && (nStored === nScreenChecked);
+
+    return {
+      match,
+      nRaw, nStored, nScreen: nScreenChecked,
+      detail: match ? "3계층 의미값 일치" : `불일치: raw=${nRaw}, stored=${nStored}, screen=${nScreenChecked}`
+    };
+  }
+
+  // =====================================================================
+  // 렌더링 함수들
+  // =====================================================================
+  function renderWeek(data) {
+    $("week-body").innerHTML = data.map((r, idx) => {
+      const prev = idx > 0 ? data[idx - 1] : null;
+      const u = Number(r.usdRaw), j = Number(r.jpyRaw);
+      
+      // T04-C24: 전일 대비 계산 (저장된 이전 값과 현재 값 비교)
+      const usdDiff = prev ? u - Number(prev.usdRaw) : null;
+      const jpyDiff = prev ? j - Number(prev.jpyRaw) : null;
+      const cross = u / (j / 100);
+
+      const usdHtml = usdDiff === null ? "—"
+        : `<span class="${usdDiff>0?'diff-pos':usdDiff<0?'diff-neg':''}">${usdDiff>0?'+':''}${fmt(usdDiff)}</span>`;
+      const jpyHtml = jpyDiff === null ? "—"
+        : `<span class="${jpyDiff>0?'diff-pos':jpyDiff<0?'diff-neg':''}">${jpyDiff>0?'+':''}${fmt(jpyDiff)}</span>`;
+
+      // T04-C18: 오래된 값 표시 (stale)
+      let stateBadge = badge("fresh", "fresh / none");
+      if (r.state !== "fresh") {
+        stateBadge = badge("stale", `stale / ${r.state}`);
+      }
+
+      return `<tr>
+        <td class="mono">${r.date}</td>
+        <td class="num">${fmt(u)}</td>
+        <td class="mid">${usdHtml}</td>
+        <td class="num">${fmt(j)}</td>
+        <td class="mid">${jpyHtml}</td>
+        <td class="mid">${fmt(cross, 2)}</td>
+        <td class="mono">${r.sourceTime}</td>
+        <td>${stateBadge}</td>
+      </tr>`;
+    }).join("");
+
+    renderSummary(data);
+    buildTriple(data);
+  }
+
+  function renderSummary(data) {
+    const usds = data.map(d => Number(d.usdRaw));
+    const jpys = data.map(d => Number(d.jpyRaw));
+    const uHigh = Math.max(...usds), uLow = Math.min(...usds);
+    const jHigh = Math.max(...jpys), jLow = Math.min(...jpys);
+    const first = usds[0], last = usds[usds.length - 1];
+    const uChg = last - first;
+    const jFirst = jpys[0], jLast = jpys[jpys.length - 1];
+    const jChg = jLast - jFirst;
+
+    $("sum-usd-high").textContent = fmt(uHigh);
+    $("sum-usd-low").textContent  = fmt(uLow);
+    $("sum-usd-chg").innerHTML = `<span class="${uChg>0?'diff-pos':uChg<0?'diff-neg':''}">${uChg>0?'+':''}${fmt(uChg)}</span>`;
+    $("sum-usd-chg-pct").textContent = `(${((uChg/first)*100).toFixed(2)}%)`;
+    $("sum-jpy-high").textContent = fmt(jHigh);
+    $("sum-jpy-low").textContent  = fmt(jLow);
+    $("sum-jpy-chg").innerHTML = `<span class="${jChg>0?'diff-pos':jChg<0?'diff-neg':''}">${jChg>0?'+':''}${fmt(jChg)}</span>`;
+    $("sum-jpy-chg-pct").textContent = `(${((jChg/jFirst)*100).toFixed(2)}%)`;
+  }
+
+  function buildTriple(data) {
+    const now = nowISO();
+    const results = [];
+
+    for (const r of data) {
+      for (const [pair, rawString, unit] of [
+        ["USD/KRW", r.usdRaw, "KRW"],
+        ["JPY(100)/KRW", r.jpyRaw, "KRW"]
+      ]) {
+        const raw = makeRawLayer(rawString, unit, r.source, r.sourceTime);
+        const stored = makeStoredLayer(rawString, unit, r.source, r.sourceTime, now);
+        const screen = makeScreenLayer(stored.value, unit, r.source, r.sourceTime, `${r.date}-${pair}`);
+
+        if (injectMismatch && r === data[3] && pair === "USD/KRW") {
+          raw._mark = true;
+        }
+
+        const check = verifyTriple(raw, stored, screen);
+        results.push({ date: r.date, pair, raw, stored, screen, check });
+      }
+    }
+
+    $("triple-week-body").innerHTML = results.map(l => {
+      const cls = l.check.match ? "" : "mismatch";
+      return `
+        <div class="triple-block ${cls}">
+          <div class="triple-head">
+            <span><span class="mono">${l.date}</span> · <span class="triple-pair">${l.pair}</span></span>
+            <span class="verdict">${l.check.match ? badge("ok","일치") : badge("err","불일치")}</span>
+          </div>
+          <dl class="layers">
+            <dt>원자료</dt><dd class="raw-string">"${l.raw.text}" <span class="mono">(원본 문자열)</span></dd>
+            <dt>저장값</dt><dd>${l.stored.value} <span class="mono">(직렬화·타입변환)</span></dd>
+            <dt>화면값</dt><dd>"${l.screen.text}" <span class="mono">(DOM read-back)</span></dd>
+            <dt>정규화</dt><dd class="norm">raw=${l.check.nRaw} / stored=${l.check.nStored} / screen=${l.check.nScreen}</dd>
+            <dt>결과</dt><dd>${l.check.match ? "✅ " + l.check.detail : "❌ " + l.check.detail}</dd>
+          </dl>
+        </div>`;
+    }).join("");
+
+    const total = results.length;
+    const matched = results.filter(r => r.check.match).length;
+    $("triple-count").textContent = `${matched}/${total}건 일치`;
+    $("triple-verdict").innerHTML = matched === total
+      ? badge("ok", "전건 일치")
+      : badge("err", `${total - matched}건 불일치`);
+
+    const isCollapsed = tripleSection.classList.contains("collapsed");
+    $("triple-newdot").innerHTML = isCollapsed
+      ? `<span class="badge new">새 데이터 ${total}건</span><span class="new-dot"></span>`
+      : "";
+
+    if ($("triple-auto").checked) {
+      setTripleOpen(true);
+    }
+  }
+
+  // =====================================================================
+  // 토글 제어
+  // =====================================================================
+  const tripleSection = $("triple-section");
+  const tripleToggle = $("triple-toggle");
+
+  function setTripleOpen(open) {
+    tripleSection.classList.toggle("collapsed", !open);
+    tripleToggle.setAttribute("aria-expanded", String(open));
+    if (open) $("triple-newdot").innerHTML = "";
+  }
+  function toggleTriple() {
+    setTripleOpen(tripleSection.classList.contains("collapsed"));
+  }
+
+  tripleToggle.addEventListener("click", (e) => {
+    if (e.target.closest(".auto-open")) return;
+    toggleTriple();
+  });
+  tripleToggle.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleTriple();
+    }
+  });
+
+  // =====================================================================
+  // 시나리오 컨트롤러 (T04-C12 ~ C21)
+  // =====================================================================
+  function fetchWeek() {
+    injectMismatch = false;
+    isRecovered = false;
+    weekData = generate7Days();
+    renderWeek(weekData);
+    $("week-state").innerHTML = badge("fresh", "정상 상태 (fresh)");
+    $("week-note").innerHTML = badge("ok", "7일 데이터 결정론적 초기화 완료") +
+      " — 이제 실패 및 복구 시나리오를 테스트할 수 있습니다.";
+  }
+
+  // T04-C12~C16, C17, C18: 실패 적용
+  function applyFailure() {
+    if (!weekData) { fetchWeek(); return; }
+    
+    const errorType = $("fixture-select").value;
+    const idx = weekData.length - 1; // 가장 최근(오늘) 데이터를 실패로 변경
+    
+    // 마지막 정상값 유지하면서 상태만 stale로 변경
+    weekData[idx] = {
+      ...weekData[idx],
+      state: errorType,
+      sourceTime: weekData[idx-1]?.sourceTime || weekData[idx].sourceTime // 출처 시각을 이전 정상값 시각으로 유지
+    };
+    
+    renderWeek(weekData);
+    $("week-state").innerHTML = badge("stale", `일부 stale (${errorType})`);
+    $("week-note").innerHTML = badge("err", `${errorType} 에러 발생 (T04-C12~16)`) + 
+      " — 마지막 정상값이 지워지지 않고 유지되며, 오래된 값(stale) 표시가 붙습니다 (T04-C17, C18).";
+    setTripleOpen(true);
+  }
+
+  // T04-C19: 복구 시나리오 (Recover D2)
+  function recover() {
+    if (!weekData) { alert("먼저 데이터를 불러오세요."); return; }
+    if (isRecovered) { alert("이미 복구되었습니다. 초기화 후 다시 시도하세요."); return; }
+
+    // 모든 상태를 fresh로 변경
+    weekData.forEach(d => d.state = "fresh");
+
+    // T04-RECOVER-D2 시뮬레이션: 다음 날짜의 새 행 1건 추가
+    const lastDate = new Date(weekData[weekData.length - 1].iso);
+    const nextDate = new Date(lastDate.getTime() + 24 * 3600 * 1000);
+    
+    weekData.push({
+      iso: nextDate.toISOString(),
+      date: kstDate(nextDate.toISOString()),
+      usdRaw: "1345.00", // 복구 값 (Next Day)
+      jpyRaw: "850.00",
+      source: "합성 공개 원천 (ECOS 대체)",
+      sourceTime: nextDate.toISOString(),
+      state: "fresh"
+    });
+
+    // 7일 배열 유지 (가장 오래된 것 삭제 - C21)
+    if(weekData.length > 7) weekData.shift();
+    
+    isRecovered = true;
+    renderWeek(weekData);
+    
+    $("week-state").innerHTML = badge("fresh", "복구 완료 (fresh)");
+    $("week-note").innerHTML = badge("ok", "T04-RECOVER-D2 성공 (T04-C19)") + 
+      " — 상태가 <strong>fresh / none</strong>으로 돌아왔고, 다음 날짜의 일별 기록이 정확히 1건 추가되었습니다.";
+    setTripleOpen(true);
+  }
+
+  // T04-C10 반증 데모: 3계층 불일치 주입
+  function injectMismatchDemo() {
+    if (!weekData) { fetchWeek(); }
+    injectMismatch = true;
+    weekData[3]._mismatchDemo = true;
+    renderWeek(weekData);
+    $("week-note").innerHTML = badge("err", "3계층 불일치 1건 주입됨 (데모)") +
+      " — 4번째 날 USD/KRW 화면값이 고의로 변조되었습니다. 하단 대조표를 확인하세요.";
+    setTripleOpen(true);
+  }
+
+  // ---------- 이벤트 리스너 등록 ----------
+  $("btn-fetch-week").addEventListener("click", fetchWeek);
+  $("btn-inject-mismatch").addEventListener("click", injectMismatchDemo);
+  
+  // 실패 및 복구 버튼
+  $("btn-apply-failure").addEventListener("click", applyFailure);
+  $("btn-recover").addEventListener("click", recover);
+
+  // 초기 상태 표시
+  $("week-state").innerHTML = badge("none", "대기");
+  
+  // 페이지 로드 시 자동으로 초기화
+  fetchWeek();
+})();
+</script>
+</body>
+</html>
