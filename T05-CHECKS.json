@@ -1,0 +1,74 @@
+{
+  "checks": [
+    {
+      "id": "T05-CHK-01",
+      "name": "7일 데이터 초기화 정상 동작",
+      "input": "btn-fetch-week 클릭",
+      "expected": "7일 데이터가 생성되고 week-state가 fresh로 표시됨",
+      "category": "init"
+    },
+    {
+      "id": "T05-CHK-02",
+      "name": "테이블 행 수 검증",
+      "input": "초기화 후 week-body",
+      "expected": "정확히 7개의 데이터 행이 표시됨",
+      "category": "init"
+    },
+    {
+      "id": "T05-CHK-03",
+      "name": "실패 적용 시 stale 상태 전환",
+      "input": "T04-AUTH-401 선택 후 btn-apply-failure 클릭",
+      "expected": "최근 행의 상태가 stale로 변경되고 유지됨",
+      "category": "failure"
+    },
+    {
+      "id": "T05-CHK-04",
+      "name": "실패 시 이전 정상값 유지",
+      "input": "실패 적용 후 usd/jpy 값 확인",
+      "expected": "값이 삭제되지 않고 이전 정상값이 유지됨",
+      "category": "failure"
+    },
+    {
+      "id": "T05-CHK-05",
+      "name": "복구 버튼 실행",
+      "input": "btn-recover 클릭",
+      "expected": "복구 프로세스가 실행됨",
+      "category": "recover"
+    },
+    {
+      "id": "T05-CHK-06",
+      "name": "복구 후 fresh 상태 복귀",
+      "input": "복구 후 week-state 확인",
+      "expected": "모든 행이 fresh 상태로 복귀",
+      "category": "recover"
+    },
+    {
+      "id": "T05-CHK-07",
+      "name": "복구 시 D+1 행 추가",
+      "input": "복구 후 week-body 행 수 확인",
+      "expected": "복구로 인해 새 일별 기록이 정확히 1건 추가됨",
+      "category": "recover"
+    },
+    {
+      "id": "T05-CHK-08",
+      "name": "7일 윈도우 유지",
+      "input": "복구 후 행 수 확인",
+      "expected": "총 행 수가 7을 초과하지 않음 (최대 7일 유지)",
+      "category": "window"
+    },
+    {
+      "id": "T05-CHK-09",
+      "name": "3계층 대조 일치",
+      "input": "원자료·저장값·화면값 대조 확인",
+      "expected": "모든 항목에서 3계층 의미값이 일치",
+      "category": "validation"
+    },
+    {
+      "id": "T05-CHK-10",
+      "name": "전일 대비 계산 정상",
+      "input": "테이블 전일대비 컬럼 확인",
+      "expected": "전일 대비 증감이 올바르게 계산되어 표시됨",
+      "category": "calculation"
+    }
+  ]
+}
